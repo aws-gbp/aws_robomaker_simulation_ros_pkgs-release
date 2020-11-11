@@ -1,36 +1,9 @@
-# AWS RoboMaker ROS Message Service
+# AWS Robomaker ROS Service
 
-This package contains ROS service definitions for service endpoints provided inside of an AWS RoboMaker simulation.
+This package contains ROS service definitions for service endpoints provided
+inside of an AWS RoboMaker simulation.
 
-**Visit the [AWS RoboMaker website](https://aws.amazon.com/robomaker/) to learn more about building intelligent robotic applications with Amazon Web Services.**
-
-## Install
-
-You will need the source code in your workspace. 
-
-1. Add a .rosinstall file with the contents below into your workspace folder then run `rosws update`:
-```
-- git: {local-name: src/aws-robomaker-simulation-ros-pkgs, uri: 'https://github.com/aws-robotics/aws-robomaker-simulation-ros-pkgs.git', version: master}
-```
-
-2. Add a dependency to your package.xml to access the service types (.srv):
-```
-<package>
-   ...
-   <depend>aws_robomaker_simulation_ros_pkgs</depend>
-</package>
-```
-
-3. Follow the Python usage below and then build and bundle your workspace as per usual:
-```bash
-# build for ROS
-rosws update
-rosdep install --from-paths . --ignore-src -r -y
-colcon build
-colcon bundle
-```
-
-## Usage
+# Tag API
 
 You can tag, untag, and list tags in your simulation job from the ROS command-line or in your ROS application while it is running. See [AWS RoboMaker documentation](https://docs.aws.amazon.com/robomaker/latest/dg/simulation-job-tags.html). You must have an IAM role with the permissions below. Replace account# with your account number.
 
@@ -45,7 +18,7 @@ You can tag, untag, and list tags in your simulation job from the ROS command-li
                 "robomaker:ListTagsForResource"
             ],
             "Resource": [
-                "arn:aws:robomaker:*:account#:simulation-job/*"
+                "arn:aws:robomaker:*:<account#>:simulation-job/*"
             ],
             "Effect": "Allow"
         }
@@ -53,74 +26,111 @@ You can tag, untag, and list tags in your simulation job from the ROS command-li
 }
 ```
 
-### AddTags
+## AddTags
 
-#### Python
+### Python
 
 ```python
-import rospy
+import rclpy
 from robomaker_simulation_msgs.msg import Tag
 from robomaker_simulation_msgs.srv import AddTags
 
 def add_tags_to_my_sim():
-    add_tags([Tag(key="name", value="my_test")])
+    # If not already initialized:
+    rclpy.init()
+    add_node = rclpy.create_node('add_my_tags')
+    add_tags(add_node, [Tag(key="name", value="my_test")])
 
-def add_tags(tags):
-    timeoutInSeconds = 60
-    rospy.wait_for_service('/robomaker/job/add_tags', timeout=timeoutInSeconds)
-    requestAddTags = rospy.ServiceProxy('/robomaker/job/add_tags', AddTags)
-    response = requestAddTags(tags)
+def add_tags(node, tags):
+    client = node.create_client(AddTags, '/robomaker/job/add_tags')
+    client.wait_for_service(timeout_sec=30)
+
+    request = AddTags.Request()
+    request.tags = tags
+    future_response = client.call_async(request)
+    rclpy.spin_until_future_complete(node, future_response)
+    response = future_response.result()
     if not response.success:
         # AddTags failed
-        print response.message
+        print(response.message)
+```
+
+### C++
 
 ```
 
-### RemoveTag
+```
 
-#### Python
+## RemoveTags
+
+### Python
 
 ```python
-import rospy
+import rclpy
 from robomaker_simulation_msgs.srv import RemoveTags
 
 def remove_tags_from_my_sim():
-    remove_tags([Tag(key="name", value="my_test")])
+    # If not already initialized:
+    rclpy.init()
+    remove_node = rclpy.create_node('remove_my_tags')
+    remove_tags(remove_node, ['name'])
 
-def remove_tags(tags):
-    timeoutInSeconds = 60
-    rospy.wait_for_service('/robomaker/job/remove_tags', timeout=timeoutInSeconds)
-    requestRemoveTags = rospy.ServiceProxy('/robomaker/job/remove_tags', RemoveTags)
-    response = requestRemoveTags(tags)
+def remove_tags(node, keys):
+    client = node.create_client(RemoveTags, '/robomaker/job/remove_tags')
+    client.wait_for_service(timeout_sec=30)
+
+    request = RemoveTags.Request()
+    request.keys = keys
+    future_response = client.call_async(request)
+    rclpy.spin_until_future_complete(node, future_response)
+    response = future_response.result()
     if not response.success:
         # RemoveTags failed
-        print response.message
+        print(response.message)
 
 ```
 
-### ListTags
+### C++
 
-#### Python
+```
+
+```
+
+## ListTags
+
+### Python
 
 ```python
-import rospy
+import rclpy
 from robomaker_simulation_msgs.srv import ListTags
 
-def list_tags():
-    timeoutInSeconds = 60
-    rospy.wait_for_service('/robomaker/job/list_tags', timeout=timeoutInSeconds)
-    requestListTags = rospy.ServiceProxy('/robomaker/job/list_tags', ListTags)
-    response = requestListTags()
+def list_tags_on_my_sim():
+    # If not already initialized:
+    rclpy.init()
+    list_node = rclpy.create_node('list_my_tags')
+    list_tags(list_node)
+
+def list_tags(node):
+    client = node.create_client(ListTags, '/robomaker/job/list_tags')
+    client.wait_for_service(timeout_sec=30)
+    future_response = client.call_async(ListTags.Request())
+    rclpy.spin_until_future_complete(node, future_response)
+    response = future_response.result()
     if response.success:
         # ListTags succeeded
-        print response.tags
+        print(response.tags)
     else:
         # ListTags failed
-        print response.message
+        print(response.message)
+```
+
+### C++
 
 ```
 
-### CancelSimulation
+```
+
+## CancelSimulation API
 
 You can cancel your simulation job from the ROS command-line or in your ROS application while it is running. See [AWS RoboMaker documentation](https://docs.aws.amazon.com/robomaker/latest/dg/simulation-job-playback-rosbags.html#simulation-job-playback-rosbags-cancel). You must have an IAM role with the permissions below. Replace account# with your account number. 
 
@@ -133,7 +143,7 @@ You can cancel your simulation job from the ROS command-line or in your ROS appl
                 "robomaker:CancelSimulationJob"
             ],
             "Resource": [
-                "arn:aws:robomaker:*:account#:simulation-job/*"
+                "arn:aws:robomaker:*:<account#>:simulation-job/*"
             ],
             "Effect": "Allow"
         }
@@ -141,21 +151,27 @@ You can cancel your simulation job from the ROS command-line or in your ROS appl
 }
 ```
 
-
-#### Python
+### Python
 
 ```python
-import rospy
+import rclpy
 from robomaker_simulation_msgs.srv import Cancel
 
 def cancel_job():
-    timeoutInSeconds = 60
-    rospy.wait_for_service('/robomaker/job/cancel', timeout=timeoutInSeconds)
-    requestCancel = rospy.ServiceProxy('/robomaker/job/cancel', Cancel)
-    response = requestCancel()
+    # If not already initialized
+    rclpy.init()
+    node = rclpy.create_node('cancel_my_job')
+
+    client = node.create_client(Cancel, '/robomaker/job/cancel')
+    client.wait_for_service(timeout_sec=30)
+
+    future_response = client.call_async(Cancel.Request())
+    rclpy.spin_until_future_complete(node, future_response)
+    response = future_response.result()
     if not response.success:
-        # Request cancel job failed
-        print response.message
+        # Cancel failed
+        print(response.message)
+
 ```
 
 ## License
